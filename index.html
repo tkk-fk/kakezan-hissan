@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <title>かけ算の筆算（N×M｜1〜4桁 × 1〜3桁｜v0.4）</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{ --cell:96px }
+    body{
+      font-family:'BIZ UDPGothic', system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans CJK JP', Meiryo, sans-serif;
+      background:#f4f7fb; margin:0; display:flex; flex-direction:column; align-items:center; gap:14px; padding:18px;
+      touch-action:none; /* ダブルタップ拡大や不要スクロール抑止 */
+    }
+    h2{ margin:0; color:#0f172a }
+
+    .controls{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; background:#fff; padding:12px 14px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); border:1px solid #e2e8f0 }
+    .controls input[type="number"]{ width:120px; padding:10px; font-size:22px; text-align:right; border:1px solid #cbd5e1; border-radius:10px }
+    .controls label{ font-size:22px; color:#334155 }
+    button{ padding:10px 16px; font-size:18px; border:none; border-radius:12px; cursor:pointer; min-width:68px; font-weight:700 }
+    #stepButton{ background:#0f172a; color:#fff }
+    #undoButton{ background:#334155; color:#fff }
+    #drawButton{ background:#64748b; color:#fff }
+    #drawButton.active{ background:#dc3545; box-shadow:0 0 0 3px rgba(220,53,69,.15) }
+    #clearButton{ background:#fcd34d; color:#111 }
+    #resetButton{ background:#e2e8f0; color:#111 }
+    button:disabled{ opacity:.45; cursor:not-allowed }
+
+    #calculator-wrapper{ position:relative }
+    #hissan-display{ display:grid; grid-template-columns:repeat(4, var(--cell)); grid-auto-rows:auto; gap:0; background:#fff; border:2px solid #0f172a; border-radius:12px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.08) }
+
+    .cell{ width:var(--cell); height:var(--cell); border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:clamp(24px, calc(var(--cell)*0.44), 56px); color:#0f172a; position:relative; transition:background-color .2s }
+    .cell.empty{ border:none }
+    .cell.calculating{ background:#fff8c4; border-color:#f7d777 }
+
+    /* かける記号 */
+    .cell.op{ border:none; font-size:clamp(22px, calc(var(--cell)*0.38), 40px); font-weight:700; color:#475569; pointer-events:none }
+
+    /* 繰り上がり（上1/3帯） */
+    .cell .carry{ position:absolute; inset:0 0 auto 0; height:33%; border-bottom:2px dashed #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:clamp(12px, calc(var(--cell)*0.22), 28px); font-weight:700; color:#475569; pointer-events:none }
+    .cell.carry-row{ height: calc(var(--cell) / 3); border:none }
+    .cell.carry-row .carry{ position:static; height:100%; border:none }
+
+    /* 区切り線 */
+    .line{ grid-column:1 / -1; height:2px; background:#0f172a; border:none; margin:6px 0 }
+
+    /* 色分けテーマ（p1=青, p2=緑, p3=橙） */
+    .p1-digit{ color:#2563eb; font-weight:700 }
+    .p1-carry{ color:#3b82f6 }
+    .p2-digit{ color:#059669; font-weight:700 }
+    .p2-carry{ color:#10b981 }
+    .p3-digit{ color:#f59e0b; font-weight:700 }
+    .p3-carry{ color:#fbbf24 }
+    .ans-digit{ color:#0f172a; font-weight:800 }
+    .sum-carry{ color:#7c3aed; font-weight:700 }
+
+    /* 手書きレイヤー */
+    #drawingCanvas{ position:absolute; inset:0; pointer-events:none; touch-action:none }
+
+    @media (max-width: 520px){ :root{ --cell:81px } .controls input[type="number"]{ width:100px; font-size:20px } }
+  </style>
+</head>
+<body>
+  <h2>かけ算の筆算ステップ練習</h2>
+  <div class="controls">
+    <input type="number" id="num1" value="34" min="1" max="9999" />
+    <label>×</label>
+    <input type="number" id="num2" value="27" min="1" max="999" />
+    <button id="stepButton">▶️　つぎへ</button>
+    <button id="undoButton">⏮ もどす</button>
+    <button id="drawButton">✏️　かく</button>
+    <button id="clearButton">けす</button>
+    <button id="resetButton">リセット</button>
+  </div>
+
+  <div id="calculator-wrapper">
+    <div id="hissan-display"></div>
+    <canvas id="drawingCanvas"></canvas>
+  </div>
+
+  <script>
+    // ========= ユーティリティ =========
+    const el = s => document.querySelector(s)
+    const make = (tag, cls) => { const x=document.createElement(tag); if(cls) x.className=cls; return x }
+    const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x|0))
+
+    // ========= グローバル状態 =========
+    let cols = 4
+    let stepList = []
+    let stepIndex = -1 // 初期化前
+    let workCarry = 0  // 現在フェーズのくり上がり
+
+    // 右詰め桁配列を作る（長さ cols）
+    function rightDigits(n, cols){
+      const arr = String(n).split('').map(Number)
+      const out = new Array(cols).fill(null)
+      for(let i=0;i<arr.length;i++) out[cols-1-i] = arr[arr.length-1-i]
+      return out
+    }
+
+    // ========= キャンバス（手書き） =========
+    const canvas = el('#drawingCanvas'); const ctx = canvas.getContext('2d');
+    const hissan = el('#hissan-display')
+    let isDrawingMode=false, isDrawing=false, lastX=0, lastY=0
+
+    function resizeCanvas(){ canvas.width = hissan.offsetWidth; canvas.height = hissan.offsetHeight; ctx.strokeStyle='rgba(255,0,0,.7)'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round' }
+    window.addEventListener('load', resizeCanvas); window.addEventListener('resize', resizeCanvas)
+
+    el('#drawButton').addEventListener('click', ()=>{ isDrawingMode=!isDrawingMode; el('#drawButton').classList.toggle('active', isDrawingMode); canvas.style.pointerEvents = isDrawingMode? 'auto':'none';  })
+    el('#clearButton').addEventListener('click', ()=> ctx.clearRect(0,0,canvas.width,canvas.height))
+
+    ;['mousedown','mousemove','mouseup','mouseout'].forEach(ev=> canvas.addEventListener(ev, mouseDraw, {passive:false}))
+    ;['touchstart','touchmove','touchend','touchcancel'].forEach(ev=> canvas.addEventListener(ev, touchDraw, {passive:false}))
+
+    function mouseDraw(e){ if(!isDrawingMode) return; if(e.type==='mousedown'){ isDrawing=true; const [x,y]=coords(e); lastX=x; lastY=y; ctx.beginPath(); ctx.moveTo(x,y) } else if(e.type==='mousemove'){ if(!isDrawing) return; e.preventDefault(); const [x,y]=coords(e); ctx.lineTo(x,y); ctx.stroke(); lastX=x; lastY=y } else { if(!isDrawing) return; ctx.closePath(); isDrawing=false } }
+    function touchDraw(e){ if(!isDrawingMode) return; const t=e.type; if(t==='touchstart'){ isDrawing=true; const [x,y]=coords(e); lastX=x; lastY=y; ctx.beginPath(); ctx.moveTo(x,y) } else if(t==='touchmove'){ if(!isDrawing) return; e.preventDefault(); const [x,y]=coords(e); ctx.lineTo(x,y); ctx.stroke(); lastX=x; lastY=y } else { if(!isDrawing) return; ctx.closePath(); isDrawing=false } }
+    function coords(e){ const r=canvas.getBoundingClientRect(); let x,y; if(e.touches){ x=e.touches[0].clientX-r.left; y=e.touches[0].clientY-r.top } else { x=e.clientX-r.left; y=e.clientY-r.top } return [x,y] }
+
+    // ========= 盤の生成 =========
+    let idsAll = [] // スナップショット対象ID
+
+    function buildBoard(n1, n2){
+      const len1 = String(n1).length // 1..4
+      const len2 = String(n2).length // 1..3
+      cols = Math.max(4, len1 + len2) // 1x1でも最低4列確保
+      hissan.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`
+      hissan.innerHTML = ''
+      idsAll = []
+
+      // 1) 上の数（被乗数）
+      appendDigitRow('n1-c', '', cols)
+      // 2) 下の数（乗数）
+      appendDigitRow('n2-c', '', cols)
+
+      // × 記号は「n2 行」の左側の空きマスに表示
+      const opIndex = Math.max(0, cols - len2 - 1)
+      const opCell = document.getElementById(`n2-c${opIndex}`)
+      if(opCell){ opCell.classList.add('op'); opCell.textContent = '✖️' }
+
+      appendLine()
+
+      // 部分積行（len2本）: それぞれ carry 行 + digit 行
+      for(let r=0; r<len2; r++){
+        const theme = r===0? 'p1': r===1? 'p2': 'p3'
+        appendCarryRow(`c_p${r+1}-c`, `${theme}-carry`, cols)
+        appendDigitRow(`p${r+1}-c`, `${theme}-digit`, cols)
+      }
+
+      appendLine()
+      // 加算くり上がり
+      appendCarryRow('c_sum-c', 'sum-carry', cols)
+      // 答え
+      appendDigitRow('ans-c', 'ans-digit', cols)
+
+      // 値を右詰めでセット
+      const A = rightDigits(n1, cols)
+      const B = rightDigits(n2, cols)
+      for(let i=0;i<cols;i++) setText(`n1-c${i}`, A[i]??'')
+      for(let i=0;i<cols;i++) setText(`n2-c${i}`, B[i]??'')
+      // × は上書きで消えるので再設定
+      if(opCell){ opCell.textContent = '✖️' }
+
+      resizeCanvas()
+    }
+
+    function appendDigitRow(prefix, rowClass, count){
+      for(let i=0;i<count;i++){
+        const c = make('div', `cell ${rowClass}`)
+        c.id = `${prefix}${i}`
+        hissan.appendChild(c)
+        idsAll.push(c.id)
+      }
+    }
+    function appendCarryRow(prefix, rowClass, count){
+      for(let i=0;i<count;i++){
+        const c = make('div', 'cell carry-row')
+        const car = make('div', `carry ${rowClass}`)
+        car.id = `${prefix}${i}`
+        c.appendChild(car)
+        hissan.appendChild(c)
+        idsAll.push(car.id)
+      }
+    }
+    function appendLine(){ const line = make('div', 'line'); hissan.appendChild(line) }
+
+    function setText(id, val){ const e=document.getElementById(id); if(e) e.textContent = (val===null||val===undefined)? '' : String(val) }
+    function getText(id){ const e=document.getElementById(id); return e? e.textContent: '' }
+
+    function clearHighlights(){ hissan.querySelectorAll('.cell.calculating').forEach(e=> e.classList.remove('calculating')) }
+    function highlightIds(ids){ clearHighlights(); ids.forEach(id=>{ const e=document.getElementById(id); if(e) e.classList.add('calculating') }) }
+
+    // ========= ステップリスト生成（汎用） =========
+    let n1=34, n2=27, A=[], B=[], len1=2, len2=2
+
+    function initProblem(){
+      n1 = clamp(parseInt(el('#num1').value||'0'), 1, 9999)
+      n2 = clamp(parseInt(el('#num2').value||'0'), 1, 999)
+      el('#num1').value = n1
+      el('#num2').value = n2
+
+      len1 = String(n1).length
+      len2 = String(n2).length
+      buildBoard(n1, n2)
+
+      A = rightDigits(n1, cols)
+      B = rightDigits(n2, cols)
+
+      // 入力ロック
+      el('#num1').disabled = true; el('#num2').disabled = true
+
+      // ステップ構築
+      stepList = []
+      // 各部分積行（ユニット→十→百）
+      for(let r=0; r<len2; r++){
+        const bIndex = cols-1-r // 下のr桁目（右から）
+        // 行ごとにくり上がりを0へ（実行時に使う）
+        for(let k=0; k<len1; k++){
+          const srcCol = cols-1-k // 上のk桁目
+          const tgtCol = srcCol - r // rだけ左にずらす
+          stepList.push({kind:'hl', ids:[`n2-c${bIndex}`, `n1-c${srcCol}`]})
+          stepList.push({kind:'p', row:r, srcCol, col:tgtCol})
+        }
+        // 行の最終くり上がり書き出し
+        const carryCol = (cols-1-len1) - r
+        stepList.push({kind:'p_carryOut', row:r, col:carryCol})
+      }
+
+      // 加算
+      for(let c=cols-1; c>=0; c--){
+        const ids = []
+        for(let r=0; r<len2; r++) ids.push(`p${r+1}-c${c}`)
+        stepList.push({kind:'hl', ids})
+        stepList.push({kind:'sum', col:c, rows:len2})
+      }
+      stepList.push({kind:'done'})
+
+      stepIndex = -1
+      updateUndoBtn()
+    }
+
+    // ========= スナップショット（UNDO） =========
+    const history = []
+    function pushSnapshot(){
+      const snap = { stepIndex, workCarry, texts:{}, hl:[], num1Dis:el('#num1').disabled, num2Dis:el('#num2').disabled, stepBtn: el('#stepButton').textContent }
+      idsAll.forEach(id=> snap.texts[id] = getText(id))
+      snap.hl = [...hissan.querySelectorAll('.cell.calculating')].map(e=> e.id).filter(Boolean)
+      history.push(JSON.stringify(snap))
+      updateUndoBtn()
+    }
+    function undo(){
+      const raw = history.pop(); if(!raw) return
+      const s = JSON.parse(raw)
+      stepIndex = s.stepIndex; workCarry = s.workCarry
+      idsAll.forEach(id=> setText(id, s.texts[id]))
+      clearHighlights(); s.hl.forEach(id=> { const e=document.getElementById(id); if(e) e.classList.add('calculating') })
+      el('#num1').disabled = s.num1Dis; el('#num2').disabled = s.num2Dis
+      el('#stepButton').textContent = s.stepBtn
+      updateUndoBtn()
+    }
+    function updateUndoBtn(){ el('#undoButton').disabled = history.length===0 }
+
+    // ========= ステップ実行 =========
+    function doStep(){
+      
+      // 初回: 問題セット
+      if(stepIndex===-1){ initProblem(); stepIndex=0; workCarry=0; applyStep(stepList[0]); return }
+      // 完了後はリセット扱い
+      if(stepIndex>=stepList.length-1){ resetAll(); return }
+      pushSnapshot();
+      stepIndex++
+      applyStep(stepList[stepIndex])
+    }
+
+    function applyStep(step){
+      if(!step) return
+      switch(step.kind){
+        case 'hl': highlightIds(step.ids); break
+        case 'p': doPartial(step.row, step.srcCol, step.col); break
+        case 'p_carryOut': writeFinalCarry(step.row, step.col); break
+        case 'sum': doSum(step.col, step.rows); break
+        case 'done': clearHighlights(); trimAnswerLeadingZeros(); el('#stepButton').textContent='リセット'; break
+      }
+    }
+
+    // ========= 各フェーズ計算 =========
+    function multiplierDigit(row){ return Number(getText(`n2-c${cols-1-row}`)||0) }
+
+    function doPartial(row, srcCol, col){
+      if(srcCol<0) return
+      const a = Number(getText(`n1-c${srcCol}`)||0)
+      const b = multiplierDigit(row)
+      const prod = a*b + workCarry
+      const d = prod % 10; workCarry = Math.floor(prod/10)
+      if(col>=0) setText(`p${row+1}-c${col}`, d)
+      if(col-1>=0) setText(`c_p${row+1}-c${col-1}`, workCarry>0? workCarry: '')
+    }
+
+    function writeFinalCarry(row, col){
+      if(workCarry<=0) return
+      if(col>=0) setText(`p${row+1}-c${col}`, workCarry)
+      workCarry = 0
+    }
+
+    function doSum(col, rows){
+      let s = workCarry
+      for(let r=0; r<rows; r++) s += Number(getText(`p${r+1}-c${col}`)||0)
+      const d = s % 10; workCarry = Math.floor(s/10)
+      setText(`ans-c${col}`, d)
+      if(col-1>=0) setText(`c_sum-c${col-1}`, workCarry>0? workCarry: '')
+    }
+
+    // ====== 先頭の0を非表示（答え） ======
+    function trimAnswerLeadingZeros(){
+      let started=false; 
+      for(let i=0;i<cols;i++){
+        const id = `ans-c${i}`;
+        const v  = getText(id);
+        if(!started){
+          if(v==='' || v==='0'){ setText(id, ''); continue }
+          started = true;
+        }
+      }
+    }
+
+    // ========= 初期化/リセット =========
+    function resetAll(){
+      ctx.clearRect(0,0,canvas.width,canvas.height)
+      el('#num1').disabled=false; el('#num2').disabled=false
+      buildBoard(clamp(el('#num1').value,1,9999), clamp(el('#num2').value,1,999))
+      stepList=[]; stepIndex=-1; workCarry=0; history.length=0
+      clearHighlights(); el('#stepButton').textContent='▶️'; updateUndoBtn()
+    }
+
+    // ========= イベント =========
+    el('#stepButton').addEventListener('click', doStep)
+    el('#undoButton').addEventListener('click', undo)
+    el('#resetButton').addEventListener('click', resetAll)
+
+    // 初期描画（空盤）
+    buildBoard(34,27)
+  </script>
+</body>
+</html>
