@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-  <title>かけ算の筆算（N×M｜1〜4桁 × 1〜3桁｜v0.4）</title>
+  <title>掛け算の筆算電卓（N×M｜1〜4桁 × 1〜3桁｜v0.4）</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
@@ -28,7 +28,7 @@
     #resetButton{ background:#e2e8f0; color:#111 }
     button:disabled{ opacity:.45; cursor:not-allowed }
 
-    #calculator-wrapper{ position:relative }
+    #calculator-wrapper{ position:relative; max-width:100vw; overflow:hidden }
     #hissan-display{ display:grid; grid-template-columns:repeat(4, var(--cell)); grid-auto-rows:auto; gap:0; background:#fff; border:2px solid #0f172a; border-radius:12px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.08) }
 
     .cell{ width:var(--cell); height:var(--cell); border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:clamp(24px, calc(var(--cell)*0.44), 56px); color:#0f172a; position:relative; transition:background-color .2s }
@@ -63,7 +63,7 @@
   </style>
 </head>
 <body>
-  <h2>かけ算の筆算ステップ練習</h2>
+  <h2>かけ算の筆算</h2>
   <div class="controls">
     <input type="number" id="num1" value="34" min="1" max="9999" />
     <label>×</label>
@@ -105,7 +105,16 @@
     const hissan = el('#hissan-display')
     let isDrawingMode=false, isDrawing=false, lastX=0, lastY=0
 
-    function resizeCanvas(){ canvas.width = hissan.offsetWidth; canvas.height = hissan.offsetHeight; ctx.strokeStyle='rgba(255,0,0,.7)'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round' }
+    function resizeCanvas(){
+      // リサイズ時にもセルサイズを最適化（iPad横向き/スマホ対策）
+      try{ autoFitCell() }catch(e){}
+      canvas.width = hissan.offsetWidth
+      canvas.height = hissan.offsetHeight
+      ctx.strokeStyle='rgba(255,0,0,.7)'
+      ctx.lineWidth=3
+      ctx.lineCap='round'
+      ctx.lineJoin='round'
+    }
     window.addEventListener('load', resizeCanvas); window.addEventListener('resize', resizeCanvas)
 
     el('#drawButton').addEventListener('click', ()=>{ isDrawingMode=!isDrawingMode; el('#drawButton').classList.toggle('active', isDrawingMode); canvas.style.pointerEvents = isDrawingMode? 'auto':'none';  })
@@ -121,47 +130,59 @@
     // ========= 盤の生成 =========
     let idsAll = [] // スナップショット対象ID
 
+    // ====== 端末サイズに合わせてセルを自動フィット ======
+    function autoFitCell(){
+      const vw = Math.min(window.innerWidth || 0, document.documentElement.clientWidth || 0) || window.innerWidth
+      const vh = Math.min(window.innerHeight || 0, document.documentElement.clientHeight || 0) || window.innerHeight
+      const controls = document.querySelector('.controls')
+      const controlsH = controls ? controls.getBoundingClientRect().height : 0
+
+      const availW = Math.max(240, vw - 32)
+      const availH = Math.max(240, vh - controlsH - 56)
+
+      const units = 4*len2 + 10 // 高さの単位（1/3セル単位）
+      const cellByW = Math.floor(availW / Math.max(1, cols))
+      const cellByH = Math.floor((3 * availH) / Math.max(1, units))
+
+      const cell = Math.max(44, Math.min(120, cellByW, cellByH))
+      document.documentElement.style.setProperty('--cell', cell + 'px')
+    }
+
     function buildBoard(n1, n2){
-      const len1 = String(n1).length // 1..4
-      const len2 = String(n2).length // 1..3
-      cols = Math.max(4, len1 + len2) // 1x1でも最低4列確保
+      const l1 = String(n1).length // 1..4
+      const l2 = String(n2).length // 1..3
+      len1 = l1; len2 = l2; // グローバルへ反映（オートフィット用）
+      cols = Math.max(4, l1 + l2)
       hissan.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`
       hissan.innerHTML = ''
       idsAll = []
 
-      // 1) 上の数（被乗数）
       appendDigitRow('n1-c', '', cols)
-      // 2) 下の数（乗数）
       appendDigitRow('n2-c', '', cols)
 
-      // × 記号は「n2 行」の左側の空きマスに表示
-      const opIndex = Math.max(0, cols - len2 - 1)
+      const opIndex = Math.max(0, cols - l2 - 1)
       const opCell = document.getElementById(`n2-c${opIndex}`)
       if(opCell){ opCell.classList.add('op'); opCell.textContent = '✖️' }
 
       appendLine()
 
-      // 部分積行（len2本）: それぞれ carry 行 + digit 行
-      for(let r=0; r<len2; r++){
+      for(let r=0; r<l2; r++){
         const theme = r===0? 'p1': r===1? 'p2': 'p3'
         appendCarryRow(`c_p${r+1}-c`, `${theme}-carry`, cols)
         appendDigitRow(`p${r+1}-c`, `${theme}-digit`, cols)
       }
 
       appendLine()
-      // 加算くり上がり
       appendCarryRow('c_sum-c', 'sum-carry', cols)
-      // 答え
       appendDigitRow('ans-c', 'ans-digit', cols)
 
-      // 値を右詰めでセット
       const A = rightDigits(n1, cols)
       const B = rightDigits(n2, cols)
       for(let i=0;i<cols;i++) setText(`n1-c${i}`, A[i]??'')
       for(let i=0;i<cols;i++) setText(`n2-c${i}`, B[i]??'')
-      // × は上書きで消えるので再設定
       if(opCell){ opCell.textContent = '✖️' }
 
+      autoFitCell();
       resizeCanvas()
     }
 
