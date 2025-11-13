@@ -135,17 +135,31 @@
       const vw = Math.min(window.innerWidth || 0, document.documentElement.clientWidth || 0) || window.innerWidth
       const vh = Math.min(window.innerHeight || 0, document.documentElement.clientHeight || 0) || window.innerHeight
       const controls = document.querySelector('.controls')
-      const controlsH = controls ? controls.getBoundingClientRect().height : 0
+      const controlsH = controls ? Math.ceil(controls.getBoundingClientRect().height) : 0
 
-      const availW = Math.max(240, vw - 32)
-      const availH = Math.max(240, vh - controlsH - 56)
+      const availW = Math.max(200, vw - 24) // 左右マージン合計
+      const availH = Math.max(200, vh - controlsH - 24) // 上下マージン合計
 
-      const units = 4*len2 + 10 // 高さの単位（1/3セル単位）
-      const cellByW = Math.floor(availW / Math.max(1, cols))
-      const cellByH = Math.floor((3 * availH) / Math.max(1, units))
+      // 初期推定（理論値）
+      const units = 4*len2 + 10 // 高さの1/3セル単位
+      let cellGuess = Math.min(120,
+        Math.floor(availW / Math.max(1, cols)),
+        Math.floor((3 * availH) / Math.max(1, units))
+      )
+      if(!cellGuess || cellGuess<32) cellGuess = 32
 
-      const cell = Math.max(44, Math.min(120, cellByW, cellByH))
-      document.documentElement.style.setProperty('--cell', cell + 'px')
+      document.documentElement.style.setProperty('--cell', cellGuess + 'px')
+
+      // 実測しながら縮小（オーバーフローがなくなるまで）
+      let guard = 30
+      while(guard-- > 0){
+        const r = hissan.getBoundingClientRect()
+        if(r.width <= availW && r.height <= availH) break
+        const now = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell')) || cellGuess
+        const next = Math.max(32, Math.floor(now * 0.92))
+        if(next === now) break
+        document.documentElement.style.setProperty('--cell', next + 'px')
+      }
     }
 
     function buildBoard(n1, n2){
@@ -358,6 +372,9 @@
     el('#stepButton').addEventListener('click', doStep)
     el('#undoButton').addEventListener('click', undo)
     el('#resetButton').addEventListener('click', resetAll)
+
+    // 端末の向き変更にも追従（iPad横向き対策）
+    window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ autoFitCell(); resizeCanvas() }, 200) })
 
     // 初期描画（空盤）
     buildBoard(34,27)
