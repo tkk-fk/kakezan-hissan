@@ -63,7 +63,8 @@
     #drawingCanvas{ position:absolute; inset:0; pointer-events:none; touch-action:none }
 
     /* ── ボトムキーパッド（スマホ向け） ── */
-    #keypad{ position:fixed; left:0; right:0; bottom:0; transform:translateY(100%); transition:transform .2s ease; z-index:30 }
+    /* ★ z-index を 30 → 50 に変更（ツールバーより前面に） */
+    #keypad{ position:fixed; left:0; right:0; bottom:0; transform:translateY(100%); transition:transform .2s ease; z-index:50 }
     #keypad.show{ transform:translateY(0) }
     .kp-inner{ background:#111827; color:#fff; border-top-left-radius:16px; border-top-right-radius:16px; padding:12px 12px 16px; box-shadow:0 -12px 32px rgba(0,0,0,.35) }
     .kp-title{ font-size:14px; opacity:.85; margin-bottom:4px }
@@ -75,11 +76,14 @@
     .kp-btn.ok{ background:#10b981 }
     .kp-btn.fn{ background:#4b5563 }
 
-    @media (max-width: 600px){ .toolbar{ padding:6px 8px } .toolbar button{ padding:8px 10px; font-size:15px } }
+    @media (max-width: 600px){
+      .toolbar{ padding:6px 8px }
+      .toolbar button{ padding:8px 10px; font-size:15px }
+    }
   </style>
 </head>
 <body>
-  <h2>かけ算の筆算（マスをタップして始める）</h2>
+  <h2>かけ算の筆算</h2>
   <div class="toolbar">
     <button id="stepButton">▶️ つぎへ</button>
     <button id="undoButton">⏮ もどす</button>
@@ -144,19 +148,79 @@
     const hissan = el('#hissan-display');
     let isDrawingMode=false, isDrawing=false;
 
-    function resizeCanvas(){ try{ autoFitCell(); }catch(e){} canvas.width = hissan.offsetWidth; canvas.height = hissan.offsetHeight; ctx.strokeStyle='rgba(255,0,0,.7)'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; }
+    function resizeCanvas(){
+      try{ autoFitCell(); }catch(e){}
+      canvas.width = hissan.offsetWidth;
+      canvas.height = hissan.offsetHeight;
+      ctx.strokeStyle='rgba(255,0,0,.7)';
+      ctx.lineWidth=3;
+      ctx.lineCap='round';
+      ctx.lineJoin='round';
+    }
     window.addEventListener('load', () => { buildBoard(curN1, curN2); autoFitCell(); resizeCanvas(); });
     window.addEventListener('resize', () => { autoFitCell(); resizeCanvas(); });
     window.addEventListener('orientationchange', () => setTimeout(() => { autoFitCell(); resizeCanvas(); }, 200));
 
-    el('#drawButton').addEventListener('click', () => { isDrawingMode=!isDrawingMode; el('#drawButton').classList.toggle('active', isDrawingMode); canvas.style.pointerEvents = isDrawingMode? 'auto':'none'; });
+    el('#drawButton').addEventListener('click', () => {
+      isDrawingMode=!isDrawingMode;
+      el('#drawButton').classList.toggle('active', isDrawingMode);
+      canvas.style.pointerEvents = isDrawingMode? 'auto':'none';
+    });
     el('#clearButton').addEventListener('click', () => ctx.clearRect(0,0,canvas.width,canvas.height));
 
     ['mousedown','mousemove','mouseup','mouseout'].forEach((ev) => canvas.addEventListener(ev, eMouse, {passive:false}));
     ['touchstart','touchmove','touchend','touchcancel'].forEach((ev) => canvas.addEventListener(ev, eTouch, {passive:false}));
-    function eMouse(e){ if(!isDrawingMode) return; if(e.type==='mousedown'){ isDrawing=true; const [x,y]=coords(e); ctx.beginPath(); ctx.moveTo(x,y); } else if(e.type==='mousemove'){ if(!isDrawing) return; e.preventDefault(); const [x,y]=coords(e); ctx.lineTo(x,y); ctx.stroke(); } else { if(!isDrawing) return; ctx.closePath(); isDrawing=false; } }
-    function eTouch(e){ if(!isDrawingMode) return; const t=e.type; if(t==='touchstart'){ isDrawing=true; const [x,y]=coords(e); ctx.beginPath(); ctx.moveTo(x,y); } else if(t==='touchmove'){ if(!isDrawing) return; e.preventDefault(); const [x,y]=coords(e); ctx.lineTo(x,y); ctx.stroke(); } else { if(!isDrawing) return; ctx.closePath(); isDrawing=false; } }
-    function coords(e){ const r=canvas.getBoundingClientRect(); let x,y; if(e.touches){ x=e.touches[0].clientX-r.left; y=e.touches[0].clientY-r.top; } else { x=e.clientX-r.left; y=e.clientY-r.top; } return [x,y]; }
+    function eMouse(e){
+      if(!isDrawingMode) return;
+      if(e.type==='mousedown'){
+        isDrawing=true;
+        const [x,y]=coords(e);
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+      } else if(e.type==='mousemove'){
+        if(!isDrawing) return;
+        e.preventDefault();
+        const [x,y]=coords(e);
+        ctx.lineTo(x,y);
+        ctx.stroke();
+      } else {
+        if(!isDrawing) return;
+        ctx.closePath();
+        isDrawing=false;
+      }
+    }
+    function eTouch(e){
+      if(!isDrawingMode) return;
+      const t=e.type;
+      if(t==='touchstart'){
+        isDrawing=true;
+        const [x,y]=coords(e);
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+      } else if(t==='touchmove'){
+        if(!isDrawing) return;
+        e.preventDefault();
+        const [x,y]=coords(e);
+        ctx.lineTo(x,y);
+        ctx.stroke();
+      } else {
+        if(!isDrawing) return;
+        ctx.closePath();
+        isDrawing=false;
+      }
+    }
+    function coords(e){
+      const r=canvas.getBoundingClientRect();
+      let x,y;
+      if(e.touches){
+        x=e.touches[0].clientX-r.left;
+        y=e.touches[0].clientY-r.top;
+      } else {
+        x=e.clientX-r.left;
+        y=e.clientY-r.top;
+      }
+      return [x,y];
+    }
 
     // ========= 自動フィット =========
     function autoFitCell(){
@@ -167,17 +231,38 @@
       const availW = Math.max(200, vw - 24);
       const availH = Math.max(200, vh - toolbarH - 24);
       const units = 4*len2 + 10;
-      let cellGuess = Math.min(120, Math.floor(availW/Math.max(1,cols)), Math.floor(3*availH/Math.max(1,units)));
+      let cellGuess = Math.min(120,
+        Math.floor(availW/Math.max(1,cols)),
+        Math.floor(3*availH/Math.max(1,units))
+      );
       if(!cellGuess || cellGuess<32) cellGuess=32;
       document.documentElement.style.setProperty('--cell', cellGuess+'px');
       let guard=30;
-      while(guard-- > 0){ const r=hissan.getBoundingClientRect(); if(r.width<=availW && r.height<=availH) break; const now=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell'))||cellGuess; const next=Math.max(32, Math.floor(now*0.92)); if(next===now) break; document.documentElement.style.setProperty('--cell', next+'px'); }
+      while(guard-- > 0){
+        const r=hissan.getBoundingClientRect();
+        if(r.width<=availW && r.height<=availH) break;
+        const now=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell'))||cellGuess;
+        const next=Math.max(32, Math.floor(now*0.92));
+        if(next===now) break;
+        document.documentElement.style.setProperty('--cell', next+'px');
+      }
     }
 
     // ========= 汎用関数 =========
-    function rightDigits(n, count){ const arr=String(n).split('').map(Number); const out=new Array(count).fill(null); for(let i=0;i<arr.length;i++) out[count-1-i]=arr[arr.length-1-i]; return out }
-    function setText(id, v){ const e=document.getElementById(id); if(e) e.textContent=(v===null||v===undefined)?'':String(v) }
-    function getText(id){ const e=document.getElementById(id); return e? e.textContent: '' }
+    function rightDigits(n, count){
+      const arr=String(n).split('').map(Number);
+      const out=new Array(count).fill(null);
+      for(let i=0;i<arr.length;i++) out[count-1-i]=arr[arr.length-1-i];
+      return out;
+    }
+    function setText(id, v){
+      const e=document.getElementById(id);
+      if(e) e.textContent=(v===null||v===undefined)?'':String(v);
+    }
+    function getText(id){
+      const e=document.getElementById(id);
+      return e? e.textContent: '';
+    }
 
     // ========= 盤生成 =========
     let idsAll=[];
@@ -199,7 +284,11 @@
       appendLine();
       // 部分積行（len2本。未設定時は 2 行を仮置き）
       const pp = (len2===0 ? 2 : (len2===1 ? 1 : len2));
-      for(let r=0;r<pp;r++){ const theme = r===0?'p1':r===1?'p2':'p3'; appendCarryRow(`c_p${r+1}-c`, `${theme}-carry`, cols); appendDigitRow(`p${r+1}-c`, `${theme}-digit`, cols); }
+      for(let r=0;r<pp;r++){
+        const theme = r===0?'p1':r===1?'p2':'p3';
+        appendCarryRow(`c_p${r+1}-c`, `${theme}-carry`, cols);
+        appendDigitRow(`p${r+1}-c`, `${theme}-digit`, cols);
+      }
       if(len2>1){
         appendLine();
         // 足し算の繰り上がり行 + 答え
@@ -219,9 +308,28 @@
 
       autoFitCell(); resizeCanvas();
     }
-    function appendDigitRow(prefix, rowClass, count, tappable=false){ for(let i=0;i<count;i++){ const c=make('div',`cell ${rowClass} ${tappable?'tap-target':''}`); c.id=`${prefix}${i}`; hissan.appendChild(c); idsAll.push(c.id); } }
-    function appendCarryRow(prefix, rowClass, count){ for(let i=0;i<count;i++){ const c=make('div','cell carry-row'); const car=make('div',`carry ${rowClass}`); car.id=`${prefix}${i}`; c.appendChild(car); hissan.appendChild(c); idsAll.push(car.id); } }
-    function appendLine(){ const line = make('div','line'); hissan.appendChild(line); }
+    function appendDigitRow(prefix, rowClass, count, tappable=false){
+      for(let i=0;i<count;i++){
+        const c=make('div',`cell ${rowClass} ${tappable?'tap-target':''}`);
+        c.id=`${prefix}${i}`;
+        hissan.appendChild(c);
+        idsAll.push(c.id);
+      }
+    }
+    function appendCarryRow(prefix, rowClass, count){
+      for(let i=0;i<count;i++){
+        const c=make('div','cell carry-row');
+        const car=make('div',`carry ${rowClass}`);
+        car.id=`${prefix}${i}`;
+        c.appendChild(car);
+        hissan.appendChild(c);
+        idsAll.push(car.id);
+      }
+    }
+    function appendLine(){
+      const line = make('div','line');
+      hissan.appendChild(line);
+    }
 
     // かける記号の配置を一元化
     function placeOperator(){
@@ -231,13 +339,19 @@
       const longer = Math.max(L1, L2);
       const opIndex = Math.max(0, cols - longer - 1);
       const opCell = document.getElementById(`n2-c${opIndex}`);
-      if(opCell){ opCell.classList.add('op'); opCell.textContent='×'; }
+      if(opCell){
+        opCell.classList.add('op');
+        opCell.textContent='×';
+      }
     }
 
     // ========= ステップ構築・実行 =========
     let history=[];
     function initProblem(){
-      if(!Number.isInteger(curN1) || !Number.isInteger(curN2)) { openKeypad(); return; }
+      if(!Number.isInteger(curN1) || !Number.isInteger(curN2)) {
+        openKeypad();
+        return;
+      }
       buildBoard(curN1, curN2);
       stepList=[]; history=[]; stepIndex=-1; workCarry=0;
       // 部分積（len2 行）
@@ -254,26 +368,98 @@
       }
       if(len2>1){
         // 加算
-        for(let c=cols-1;c>=0;c--){ const ids=[]; for(let r=0;r<len2;r++) ids.push(`p${r+1}-c${c}`); stepList.push({kind:'hl', ids}); stepList.push({kind:'sum', col:c, rows:len2}); }
+        for(let c=cols-1;c>=0;c--){
+          const ids=[];
+          for(let r=0;r<len2;r++) ids.push(`p${r+1}-c${c}`);
+          stepList.push({kind:'hl', ids});
+          stepList.push({kind:'sum', col:c, rows:len2});
+        }
       }
       stepList.push({kind:'done'});
     }
 
     function doStep(){
-      if(stepIndex===-1){ initProblem(); if(stepList.length===0) return; stepIndex=0; applyStep(stepList[0]); return; }
-      if(stepIndex>=stepList.length-1){ resetAll(); return; }
-      pushSnapshot(); stepIndex++; applyStep(stepList[stepIndex]);
+      if(stepIndex===-1){
+        initProblem();
+        if(stepList.length===0) return;
+        stepIndex=0;
+        applyStep(stepList[stepIndex]);
+        return;
+      }
+      if(stepIndex>=stepList.length-1){
+        resetAll();
+        return;
+      }
+      pushSnapshot();
+      stepIndex++;
+      applyStep(stepIndex >= 0 ? stepList[stepIndex] : null);
     }
-    function applyStep(s){ if(!s) return; switch(s.kind){ case 'hl': highlightIds(s.ids); break; case 'p': doPartial(s.row, s.srcCol, s.col); break; case 'p_carryOut': writeFinalCarry(s.row, s.col); break; case 'sum': doSum(s.col, s.rows); break; case 'done': clearHighlights(); trimAnswerLeadingZeros(); el('#stepButton').textContent='リセット'; break; } }
-    function highlightIds(ids){ clearHighlights(); ids.forEach((id)=>{ const e=document.getElementById(id); if(e) e.classList.add('calculating'); }); }
-    function clearHighlights(){ hissan.querySelectorAll('.cell.calculating').forEach((e)=> e.classList.remove('calculating')); }
+    function applyStep(s){
+      if(!s) return;
+      switch(s.kind){
+        case 'hl':      highlightIds(s.ids); break;
+        case 'p':       doPartial(s.row, s.srcCol, s.col); break;
+        case 'p_carryOut': writeFinalCarry(s.row, s.col); break;
+        case 'sum':     doSum(s.col, s.rows); break;
+        case 'done':
+          clearHighlights();
+          trimAnswerLeadingZeros();
+          el('#stepButton').textContent='リセット';
+          break;
+      }
+    }
+    function highlightIds(ids){
+      clearHighlights();
+      ids.forEach((id)=>{
+        const e=document.getElementById(id);
+        if(e) e.classList.add('calculating');
+      });
+    }
+    function clearHighlights(){
+      hissan.querySelectorAll('.cell.calculating').forEach((e)=> e.classList.remove('calculating'));
+    }
 
-    function pushSnapshot(){ const snap={ stepIndex, workCarry, texts:{}, hl:[], stepBtn:el('#stepButton').textContent }; idsAll.forEach((id)=> snap.texts[id]=getText(id)); snap.hl=[...hissan.querySelectorAll('.cell.calculating')].map((e)=>e.id).filter(Boolean); history.push(JSON.stringify(snap)); el('#undoButton').disabled = history.length===0; }
-    function undo(){ const raw=history.pop(); if(!raw) return; const s=JSON.parse(raw); stepIndex=s.stepIndex; workCarry=s.workCarry; idsAll.forEach((id)=> setText(id,s.texts[id])); clearHighlights(); s.hl.forEach((id)=>{ const e=document.getElementById(id); if(e) e.classList.add('calculating'); }); el('#stepButton').textContent=s.stepBtn; el('#undoButton').disabled = history.length===0; }
+    function pushSnapshot(){
+      const snap={ stepIndex, workCarry, texts:{}, hl:[], stepBtn:el('#stepButton').textContent };
+      idsAll.forEach((id)=> snap.texts[id]=getText(id));
+      snap.hl=[...hissan.querySelectorAll('.cell.calculating')].map((e)=>e.id).filter(Boolean);
+      history.push(JSON.stringify(snap));
+      el('#undoButton').disabled = history.length===0;
+    }
+    function undo(){
+      const raw=history.pop();
+      if(!raw) return;
+      const s=JSON.parse(raw);
+      stepIndex=s.stepIndex;
+      workCarry=s.workCarry;
+      idsAll.forEach((id)=> setText(id,s.texts[id]));
+      clearHighlights();
+      s.hl.forEach((id)=>{
+        const e=document.getElementById(id);
+        if(e) e.classList.add('calculating');
+      });
+      el('#stepButton').textContent=s.stepBtn;
+      el('#undoButton').disabled = history.length===0;
+    }
 
-    function multiplierDigit(row){ return Number(getText(`n2-c${cols-1-row}`)||0); }
-    function doPartial(row, srcCol, col){ if(srcCol<0) return; const a=Number(getText(`n1-c${srcCol}`)||0); const b=multiplierDigit(row); const prod=a*b+workCarry; const d=prod%10; workCarry=Math.floor(prod/10); if(col>=0) setText(`p${row+1}-c${col}`, d); if(col-1>=0) setText(`c_p${row+1}-c${col-1}`, workCarry>0?workCarry:''); }
-    function writeFinalCarry(row,col){ if(workCarry<=0) return; if(col>=0) setText(`p${row+1}-c${col}`, workCarry); workCarry=0; }
+    function multiplierDigit(row){
+      return Number(getText(`n2-c${cols-1-row}`)||0);
+    }
+    function doPartial(row, srcCol, col){
+      if(srcCol<0) return;
+      const a=Number(getText(`n1-c${srcCol}`)||0);
+      const b=multiplierDigit(row);
+      const prod=a*b+workCarry;
+      const d=prod%10;
+      workCarry=Math.floor(prod/10);
+      if(col>=0) setText(`p${row+1}-c${col}`, d);
+      if(col-1>=0) setText(`c_p${row+1}-c${col-1}`, workCarry>0?workCarry:'');
+    }
+    function writeFinalCarry(row,col){
+      if(workCarry<=0) return;
+      if(col>=0) setText(`p${row+1}-c${col}`, workCarry);
+      workCarry=0;
+    }
 
     function doSum(col, rows){
       let s = workCarry;
@@ -284,12 +470,27 @@
       if(col-1>=0) setText(`c_sum-c${col-1}`, workCarry>0 ? workCarry : '');
     }
 
-    function trimAnswerLeadingZeros(){ let started=false; for(let i=0;i<cols;i++){ const id=`ans-c${i}`; const v=getText(id); if(!started){ if(v===''||v==='0'){ setText(id,''); continue; } started=true; } } }
+    function trimAnswerLeadingZeros(){
+      let started=false;
+      for(let i=0;i<cols;i++){
+        const id=`ans-c${i}`;
+        const v=getText(id);
+        if(!started){
+          if(v===''||v==='0'){
+            setText(id,'');
+            continue;
+          }
+          started=true;
+        }
+      }
+    }
 
     function resetAll(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
       // 描画モードも解除
-      isDrawingMode=false; el('#drawButton').classList.remove('active'); canvas.style.pointerEvents='none';
+      isDrawingMode=false;
+      el('#drawButton').classList.remove('active');
+      canvas.style.pointerEvents='none';
       buildBoard(curN1, curN2);
       stepList=[]; stepIndex=-1; workCarry=0; history.length=0; clearHighlights();
       el('#stepButton').textContent='▶️ つぎへ'; el('#undoButton').disabled=true;
@@ -388,7 +589,19 @@
       return [ai, bi];
     }
 
-    function shakeDisplay(){ const d=el('#kp-display'); d.style.transform='translateX(0)'; d.animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:180}); }
+    function shakeDisplay(){
+      const d=el('#kp-display');
+      d.style.transform='translateX(0)';
+      d.animate(
+        [
+          {transform:'translateX(0)'},
+          {transform:'translateX(-8px)'},
+          {transform:'translateX(8px)'},
+          {transform:'translateX(0)'}
+        ],
+        {duration:180}
+      );
+    }
 
     el('#kp-cancel').addEventListener('click', () => { closeKeypad(); });
 
@@ -402,20 +615,60 @@
       // ans 行がない（len2==1 など）場合は p1 行を読む
       const hasAns = !!document.getElementById('ans-c0');
       if(!hasAns || len2===1){
-        let s=''; for(let i=0;i<cols;i++){ const v=getText(`p1-c${i}`); s += (v && v!=='' ? v : ''); }
+        let s='';
+        for(let i=0;i<cols;i++){
+          const v=getText(`p1-c${i}`);
+          s += (v && v!=='' ? v : '');
+        }
         return s===''? '0' : s;
       }
-      let s=''; for(let i=0;i<cols;i++){ const v = getText(`ans-c${i}`); s += (v && v!=='' ? v : ''); } return s===''? '0' : s;
+      let s='';
+      for(let i=0;i<cols;i++){
+        const v = getText(`ans-c${i}`);
+        s += (v && v!=='' ? v : '');
+      }
+      return s===''? '0' : s;
     }
-    function runOneCase(a,b){ curN1=a; curN2=b; initProblem(); for(let i=0;i<stepList.length;i++) applyStep(stepList[i]); const got = parseInt(readAnswer(),10); const expect = a*b; const ok = got===expect; console.log(`[TEST] ${a}×${b} => got:${got} expect:${expect} ${ok?'✅':'❌'}`); return ok }
-    function runSelfTests(){ const cases = [[12,3],[7,8],[34,27],[123,4],[105,12],[12,307],[9999,999],[34,72],[500,500],[101,101],[2003,7],[9999,1],[9012,345],[1,999],[10,10],[2500,40],[88,250],[999,500],[4321,999],[1000,999],[808,101]]; let pass=true; cases.forEach(([a,b])=>{ pass = runOneCase(a,b) && pass }); console.log(`SelfTests: ${pass?'ALL PASS ✅':'SOME FAIL ❌'}`);
+    function runOneCase(a,b){
+      curN1=a; curN2=b;
+      initProblem();
+      for(let i=0;i<stepList.length;i++) applyStep(stepList[i]);
+      const got = parseInt(readAnswer(),10);
+      const expect = a*b;
+      const ok = got===expect;
+      console.log(`[TEST] ${a}×${b} => got:${got} expect:${expect} ${ok?'✅':'❌'}`);
+      return ok;
+    }
+    function runSelfTests(){
+      const cases = [
+        [12,3],[7,8],[34,27],[123,4],[105,12],[12,307],[9999,999],
+        [34,72],[500,500],[101,101],[2003,7],[9999,1],[9012,345],
+        [1,999],[10,10],[2500,40],[88,250],[999,500],[4321,999],
+        [1000,999],[808,101]
+      ];
+      let pass=true;
+      cases.forEach(([a,b])=>{
+        pass = runOneCase(a,b) && pass;
+      });
+      console.log(`SelfTests: ${pass?'ALL PASS ✅':'SOME FAIL ❌'}`);
       // UIテスト：かける記号が残っているか
-      curN1=34; curN2=27; buildBoard(curN1, curN2); const L1=len1||2, L2=len2||2; const idx=Math.max(0, cols-Math.max(L1,L2)-1); const op=(document.getElementById(`n2-c${idx}`)?.textContent||''); console.log(`[UI] operator visible: ${/×/.test(op)?'OK':'MISSING'}`);
+      curN1=34; curN2=27;
+      buildBoard(curN1, curN2);
+      const L1=len1||2, L2=len2||2;
+      const idx=Math.max(0, cols-Math.max(L1,L2)-1);
+      const op=(document.getElementById(`n2-c${idx}`)?.textContent||'');
+      console.log(`[UI] operator visible: ${/×/.test(op)?'OK':'MISSING'}`);
       // パーサテスト（×/✖️/x/*）
       const exprs=['345×98','345✖️98','345x98','345*98'];
-      exprs.forEach(s=>{ const norm=s.replace(/️/g,'').replace(/[xX×*✖]/,'×'); const p=parseExpr(norm); console.log(`[PARSE] '${s}' => ${p?p.join(','):'ERR'}`); });
+      exprs.forEach(s=>{
+        const norm=s.replace(/️/g,'').replace(/[xX×*✖]/,'×');
+        const p=parseExpr(norm);
+        console.log(`[PARSE] '${s}' => ${p?p.join(','):'ERR'}`);
+      });
       // 初期表示は空欄に戻す
-      curN1=null; curN2=null; resetAll(); }
+      curN1=null; curN2=null;
+      resetAll();
+    }
 
     // 初期盤（空欄）を描画し、自己テストはバックグラウンドで実行
     setTimeout(runSelfTests, 0);
