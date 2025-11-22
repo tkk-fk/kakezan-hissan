@@ -12,14 +12,38 @@
     *{ box-sizing:border-box }
     body{
       font-family:'BIZ UDPGothic', system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans CJK JP', Meiryo, sans-serif;
-      background:#f4f7fb; margin:0; display:flex; flex-direction:column; align-items:center; gap:14px; padding:16px;
+      background:#f4f7fb;
+      margin:0;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:14px;
+      padding:16px;
       touch-action:none;
     }
     h2{ margin:0; color:#0f172a; font-size:clamp(20px, 3.8vw, 28px) }
 
-    /* ── 右固定ツールバー（縦並び） ── */
-    .toolbar{ position:fixed; right: max(env(safe-area-inset-right), 10px); top: clamp(64px, 8vh, 96px); display:flex; flex-direction:column; gap:8px; background:transparent; padding:0; border:none; box-shadow:none; z-index:40 }
-    .toolbar button{ width:112px; padding:10px 12px; font-size:16px; border:none; border-radius:10px; cursor:pointer; font-weight:700 }
+    /* ── ツールバー（盤面の下・横一列） ── */
+    .toolbar{
+      margin-top:12px;
+      display:flex;
+      gap:8px;
+      justify-content:center;
+      flex-wrap:wrap;        /* 画面が狭い場合は2段に折り返し */
+      width:100%;
+      max-width:520px;       /* 盤面の横幅付近で制限 */
+    }
+    .toolbar button{
+      flex:1 1 auto;
+      min-width:80px;
+      padding:8px 10px;
+      font-size:15px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:700;
+      white-space:nowrap;
+    }
     #stepButton{ background:#0f172a; color:#fff }
     #undoButton{ background:#334155; color:#fff }
     #drawButton{ background:#64748b; color:#fff }
@@ -28,25 +52,78 @@
     #resetButton{ background:#e2e8f0; color:#111 }
 
     /* 盤面 */
-    #calculator-wrapper{ position:relative; max-width:100vw; overflow:hidden }
-    #hissan-display{ display:grid; grid-template-columns:repeat(4, var(--cell)); grid-auto-rows:auto; gap:0; background:#fff; border:2px solid #0f172a; border-radius:12px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,.08) }
+    #calculator-wrapper{
+      position:relative;
+      max-width:100vw;
+      overflow:hidden;
+    }
+    #hissan-display{
+      display:grid;
+      grid-template-columns:repeat(4, var(--cell));
+      grid-auto-rows:auto;
+      gap:0;
+      background:#fff;
+      border:2px solid #0f172a;
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 10px 30px rgba(0,0,0,.08);
+    }
 
-    .cell{ width:var(--cell); height:var(--cell); border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:clamp(24px, calc(var(--cell)*0.44), 56px); color:#0f172a; position:relative; transition:background-color .15s }
+    .cell{
+      width:var(--cell);
+      height:var(--cell);
+      border:1px solid #e2e8f0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:clamp(24px, calc(var(--cell)*0.44), 56px);
+      color:#0f172a;
+      position:relative;
+      transition:background-color .15s;
+    }
     .cell.empty{ border:none }
     .cell.calculating{ background:#fff8c4; border-color:#f7d777 }
 
     .cell.tap-target{ cursor:pointer }
 
     /* かける記号 */
-    .cell.op{ border:none; font-size:clamp(22px, calc(var(--cell)*0.38), 40px); font-weight:700; color:#475569; pointer-events:none }
+    .cell.op{
+      border:none;
+      font-size:clamp(22px, calc(var(--cell)*0.38), 40px);
+      font-weight:700;
+      color:#475569;
+      pointer-events:none;
+    }
 
     /* 繰り上がり（上1/3帯） */
-    .cell .carry{ position:absolute; inset:0 0 auto 0; height:33%; border-bottom:2px dashed #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:clamp(12px, calc(var(--cell)*0.22), 28px); font-weight:700; color:#475569; pointer-events:none }
+    .cell .carry{
+      position:absolute;
+      inset:0 0 auto 0;
+      height:33%;
+      border-bottom:2px dashed #e2e8f0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:clamp(12px, calc(var(--cell)*0.22), 28px);
+      font-weight:700;
+      color:#475569;
+      pointer-events:none;
+    }
     .cell.carry-row{ height: calc(var(--cell) / 3); border:none }
-    .cell.carry-row .carry{ position:static; height:100%; border-bottom:none }
+    .cell.carry-row .carry{
+      position:static;
+      height:100%;
+      border-bottom:none;
+    }
 
     /* 区切り線 */
-    .line{ grid-column:1 / -1; height:2px; background:#0f172a; border:none; margin:6px 0 }
+    .line{
+      grid-column:1 / -1;
+      height:2px;
+      background:#0f172a;
+      border:none;
+      margin:6px 0;
+    }
 
     /* 色分けテーマ（p1=青, p2=緑, p3=橙） */
     .p1-digit{ color:#2563eb; font-weight:700 }
@@ -60,41 +137,87 @@
     .sum-overlay{ border-bottom:none }
 
     /* 手書きレイヤー */
-    #drawingCanvas{ position:absolute; inset:0; pointer-events:none; touch-action:none }
+    #drawingCanvas{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      touch-action:none;
+    }
 
     /* ── ボトムキーパッド（スマホ向け） ── */
-    /* ★ z-index を 30 → 50 に変更（ツールバーより前面に） */
-    #keypad{ position:fixed; left:0; right:0; bottom:0; transform:translateY(100%); transition:transform .2s ease; z-index:50 }
+    #keypad{
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      transform:translateY(100%);
+      transition:transform .2s ease;
+      z-index:50;
+    }
     #keypad.show{ transform:translateY(0) }
-    .kp-inner{ background:#111827; color:#fff; border-top-left-radius:16px; border-top-right-radius:16px; padding:12px 12px 16px; box-shadow:0 -12px 32px rgba(0,0,0,.35) }
+    .kp-inner{
+      background:#111827;
+      color:#fff;
+      border-top-left-radius:16px;
+      border-top-right-radius:16px;
+      padding:12px 12px 16px;
+      box-shadow:0 -12px 32px rgba(0,0,0,.35);
+    }
     .kp-title{ font-size:14px; opacity:.85; margin-bottom:4px }
-    .kp-display{ font-size:24px; letter-spacing:3px; background:#fff; color:#111; padding:10px 12px; border-radius:10px; text-align:right; margin-bottom:8px; border:1px solid #e5e7eb }
-    .kp-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px }
-    .kp-btn{ background:#374151; color:#fff; border:none; border-radius:12px; padding:14px 0; font-size:22px; font-weight:800 }
+    .kp-display{
+      font-size:24px;
+      letter-spacing:3px;
+      background:#fff;
+      color:#111;
+      padding:10px 12px;
+      border-radius:10px;
+      text-align:right;
+      margin-bottom:8px;
+      border:1px solid #e5e7eb;
+    }
+    .kp-grid{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:8px;
+    }
+    .kp-btn{
+      background:#374151;
+      color:#fff;
+      border:none;
+      border-radius:12px;
+      padding:14px 0;
+      font-size:22px;
+      font-weight:800;
+    }
     .kp-btn.mul{ background:#f59e0b; color:#111 }
     .kp-btn.wide{ grid-column: span 2 }
     .kp-btn.ok{ background:#10b981 }
     .kp-btn.fn{ background:#4b5563 }
 
     @media (max-width: 600px){
-      .toolbar{ padding:6px 8px }
-      .toolbar button{ padding:8px 10px; font-size:15px }
+      .toolbar button{
+        padding:8px 6px;
+        font-size:14px;
+      }
     }
   </style>
 </head>
 <body>
   <h2>かけ算の筆算（マスをタップして始める）</h2>
+
+  <!-- 盤面 -->
+  <div id="calculator-wrapper">
+    <div id="hissan-display"></div>
+    <canvas id="drawingCanvas"></canvas>
+  </div>
+
+  <!-- 盤面の下に一列で並ぶツールバー -->
   <div class="toolbar">
     <button id="stepButton">▶️ つぎへ</button>
     <button id="undoButton">⏮ もどす</button>
     <button id="drawButton">✏️ かく</button>
     <button id="clearButton">けす</button>
     <button id="resetButton">リセット</button>
-  </div>
-
-  <div id="calculator-wrapper">
-    <div id="hissan-display"></div>
-    <canvas id="drawingCanvas"></canvas>
   </div>
 
   <!-- 問題入力用ボトムキーパッド（式モード） -->
@@ -129,22 +252,19 @@
     const make = (tag, cls) => { const x=document.createElement(tag); if(cls) x.className=cls; return x };
     const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x|0));
 
-    // Unicodeセーフな1文字削除
     const backspaceOne = (str) => { const a = Array.from(str||''); a.pop(); return a.join('') };
 
-    // ========= 現在の問題（初期は空欄） =========
-    let curN1 = null; // 1..9999
-    let curN2 = null; // 1..999
+    let curN1 = null;
+    let curN2 = null;
 
-    // ========= 盤面状態 =========
     let cols = 4;
     let len1 = 0, len2 = 0;
     let stepList = [];
     let stepIndex = -1;
     let workCarry = 0;
 
-    // ========= 手書き =========
-    const canvas = el('#drawingCanvas'); const ctx = canvas.getContext('2d');
+    const canvas = el('#drawingCanvas');
+    const ctx = canvas.getContext('2d');
     const hissan = el('#hissan-display');
     let isDrawingMode=false, isDrawing=false;
 
@@ -170,6 +290,7 @@
 
     ['mousedown','mousemove','mouseup','mouseout'].forEach((ev) => canvas.addEventListener(ev, eMouse, {passive:false}));
     ['touchstart','touchmove','touchend','touchcancel'].forEach((ev) => canvas.addEventListener(ev, eTouch, {passive:false}));
+
     function eMouse(e){
       if(!isDrawingMode) return;
       if(e.type==='mousedown'){
@@ -248,7 +369,6 @@
       }
     }
 
-    // ========= 汎用関数 =========
     function rightDigits(n, count){
       const arr=String(n).split('').map(Number);
       const out=new Array(count).fill(null);
@@ -264,10 +384,8 @@
       return e? e.textContent: '';
     }
 
-    // ========= 盤生成 =========
     let idsAll=[];
     function buildBoard(n1, n2){
-      // n1, n2 が未設定なら空欄で 2桁×2桁想定の盤を出す
       len1 = Number.isInteger(n1) ? String(n1).length : 0;
       len2 = Number.isInteger(n2) ? String(n2).length : 0;
       const baseL1 = len1 || 2, baseL2 = len2 || 2;
@@ -276,13 +394,11 @@
       hissan.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
       hissan.innerHTML=''; idsAll=[];
 
-      // n1行（タップ可能）
       appendDigitRow('n1-c', '', cols, true);
-      // n2行（タップ可能）
       appendDigitRow('n2-c', '', cols, true);
 
       appendLine();
-      // 部分積行（len2本。未設定時は 2 行を仮置き）
+
       const pp = (len2===0 ? 2 : (len2===1 ? 1 : len2));
       for(let r=0;r<pp;r++){
         const theme = r===0?'p1':r===1?'p2':'p3';
@@ -291,21 +407,15 @@
       }
       if(len2>1){
         appendLine();
-        // 足し算の繰り上がり行 + 答え
         appendCarryRow('c_sum-c','sum-carry',cols);
         appendDigitRow('ans-c','ans-digit',cols);
       }
 
-      // 値をセット（数値のときのみ）
       if(len1>0) rightDigits(n1, cols).forEach((v,i)=> setText(`n1-c${i}`, v??''));
       if(len2>0) rightDigits(n2, cols).forEach((v,i)=> setText(`n2-c${i}`, v??''));
 
-      // × 記号は必ず最後に描画（数字で上書きされないように）
       placeOperator();
-
-      // セルタップ→キーパッド（上2行のみ）
       enableTapToEdit();
-
       autoFitCell(); resizeCanvas();
     }
     function appendDigitRow(prefix, rowClass, count, tappable=false){
@@ -331,9 +441,7 @@
       hissan.appendChild(line);
     }
 
-    // かける記号の配置を一元化
     function placeOperator(){
-      // ルール：より桁数の“長い”数の直前（1マス左）に×を置く
       const L1 = len1 || 2;
       const L2 = len2 || 2;
       const longer = Math.max(L1, L2);
@@ -345,7 +453,6 @@
       }
     }
 
-    // ========= ステップ構築・実行 =========
     let history=[];
     function initProblem(){
       if(!Number.isInteger(curN1) || !Number.isInteger(curN2)) {
@@ -354,7 +461,7 @@
       }
       buildBoard(curN1, curN2);
       stepList=[]; history=[]; stepIndex=-1; workCarry=0;
-      // 部分積（len2 行）
+
       for(let r=0;r<len2;r++){
         for(let k=0;k<len1;k++){
           const srcCol = cols-1-k;
@@ -367,7 +474,6 @@
         stepList.push({kind:'p_carryOut', row:r, col:carryCol});
       }
       if(len2>1){
-        // 加算
         for(let c=cols-1;c>=0;c--){
           const ids=[];
           for(let r=0;r<len2;r++) ids.push(`p${r+1}-c${c}`);
@@ -487,13 +593,13 @@
 
     function resetAll(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
-      // 描画モードも解除
       isDrawingMode=false;
       el('#drawButton').classList.remove('active');
       canvas.style.pointerEvents='none';
       buildBoard(curN1, curN2);
       stepList=[]; stepIndex=-1; workCarry=0; history.length=0; clearHighlights();
-      el('#stepButton').textContent='▶️ つぎへ'; el('#undoButton').disabled=true;
+      el('#stepButton').textContent='▶️ つぎへ';
+      el('#undoButton').disabled=true;
     }
 
     // ========= 直接入力：マスをタップ→式キーパッド =========
@@ -503,7 +609,6 @@
       els('[id^="n2-c"].cell').forEach((c)=> c.addEventListener('click', openKeypad));
     }
 
-    // 画面のどこをタップしてもキーパッド（ツールバー/キーパッド/描画中は除く）
     document.addEventListener('click', (e)=>{
       if(isDrawingMode) return;
       if(e.target.closest('.toolbar') || e.target.closest('#keypad')) return;
@@ -518,7 +623,6 @@
     }
     function closeKeypad(){ el('#keypad').classList.remove('show'); }
 
-    // キーパッド動作（式モード）
     el('#keypad').addEventListener('click', (e) => {
       const b = e.target.closest('.kp-btn');
       if(!b) return;
@@ -529,10 +633,9 @@
         const parsed = parseExpr(normalized);
         if(!parsed){ shakeDisplay(); return; }
         const [a,bn] = parsed;
-        // 範囲チェック
         if(a<1 || a>9999 || bn<1 || bn>999){ shakeDisplay(); return; }
         curN1 = a; curN2 = bn;
-        resetAll(); // 盤面に即反映
+        resetAll();
         closeKeypad();
         return;
       }
@@ -550,21 +653,18 @@
         return;
       }
       if(/[xX×✖]/.test(t)){
-        if(!kpValue || /[xX×*✖]/.test(kpValue)) return; // 先頭や重複禁止
+        if(!kpValue || /[xX×*✖]/.test(kpValue)) return;
         kpValue += '×';
         el('#kp-display').textContent = kpValue;
         return;
       }
-      // 数字
       if(/^[0-9]$/.test(t)){
         const m = kpValue.match(/[xX×*✖]/);
         if(!m){
-          // 左辺（最大4桁）
           const leftLen = (kpValue.match(/\d/g)||[]).length;
           if(leftLen>=4) return;
           kpValue += t;
         }else{
-          // 右辺（最大3桁）
           const idx = m.index + m[0].length;
           const right = kpValue.slice(idx);
           const rightLen = (right.match(/\d/g)||[]).length;
@@ -605,14 +705,11 @@
 
     el('#kp-cancel').addEventListener('click', () => { closeKeypad(); });
 
-    // ========= イベント =========
     el('#stepButton').addEventListener('click', doStep);
     el('#undoButton').addEventListener('click', undo);
     el('#resetButton').addEventListener('click', resetAll);
 
-    // ========= 簡易テスト（コンソール出力） =========
     function readAnswer(){
-      // ans 行がない（len2==1 など）場合は p1 行を読む
       const hasAns = !!document.getElementById('ans-c0');
       if(!hasAns || len2===1){
         let s='';
@@ -651,27 +748,24 @@
         pass = runOneCase(a,b) && pass;
       });
       console.log(`SelfTests: ${pass?'ALL PASS ✅':'SOME FAIL ❌'}`);
-      // UIテスト：かける記号が残っているか
       curN1=34; curN2=27;
       buildBoard(curN1, curN2);
       const L1=len1||2, L2=len2||2;
       const idx=Math.max(0, cols-Math.max(L1,L2)-1);
       const op=(document.getElementById(`n2-c${idx}`)?.textContent||'');
       console.log(`[UI] operator visible: ${/×/.test(op)?'OK':'MISSING'}`);
-      // パーサテスト（×/✖️/x/*）
       const exprs=['345×98','345✖️98','345x98','345*98'];
       exprs.forEach(s=>{
         const norm=s.replace(/️/g,'').replace(/[xX×*✖]/,'×');
         const p=parseExpr(norm);
         console.log(`[PARSE] '${s}' => ${p?p.join(','):'ERR'}`);
       });
-      // 初期表示は空欄に戻す
       curN1=null; curN2=null;
       resetAll();
     }
 
-    // 初期盤（空欄）を描画し、自己テストはバックグラウンドで実行
     setTimeout(runSelfTests, 0);
   </script>
 </body>
 </html>
+
